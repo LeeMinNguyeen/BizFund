@@ -12,11 +12,24 @@ import {
 import Grid from '@mui/material/Grid';
 import type { Theme } from '@mui/material/styles';
 import type { SxProps } from '@mui/system';
+import type { GridProps } from '@mui/material';
 import axios from 'axios';
 
 interface AnalysisResult {
   image: string;
   message: string;
+}
+
+interface HistoryItem {
+  image: string;
+  message: string;
+  timestamp: string;
+  input_data: {
+    Position: string;
+    Number_of_Investor: number;
+    IsFirst: boolean;
+    IsLast: boolean;
+  };
 }
 
 interface Message {
@@ -41,13 +54,27 @@ export default function AnalysisForm() {
   const [currentInput, setCurrentInput] = useState('');
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     // Add initial question
     if (messages.length === 0) {
       setMessages([{ text: questions[0], type: 'question' as const }]);
     }
+
+    // Load history
+    fetchHistory();
   }, []);
+
+  const fetchHistory = async () => {
+    try {
+      const response = await axios.get('http://localhost:8000/history');
+      setHistory(response.data);
+    } catch (error) {
+      console.error('Error fetching history:', error);
+    }
+  };
 
   const handleInputSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,6 +135,9 @@ export default function AnalysisForm() {
               withCredentials: false
             });
             setResult(response.data);
+            setMessages(prev => [...prev, { text: 'Analysis complete!', type: 'system' as const }]);
+            // Fetch updated history after successful analysis
+            await fetchHistory();
           } catch (error) {
             console.error('Error during analysis:', error);
             setMessages(prev => [...prev, { text: 'Error during analysis. Please try again.', type: 'system' as const }]);
@@ -143,6 +173,8 @@ export default function AnalysisForm() {
           });
           setResult(response.data);
           setMessages(prev => [...prev, { text: 'Analysis complete!', type: 'system' as const }]);
+          // Fetch updated history after successful analysis
+          await fetchHistory();
         } catch (error) {
           console.error('Error during analysis:', error);
           setMessages(prev => [...prev, { text: 'Error during analysis. Please try again.', type: 'system' as const }]);
@@ -171,6 +203,8 @@ export default function AnalysisForm() {
     setCurrentInput('');
     setResult(null);
     setIsAnalyzing(false);
+    // Fetch updated history when resetting
+    fetchHistory();
   };
 
   return (
@@ -179,58 +213,117 @@ export default function AnalysisForm() {
         {/* Left side - Chat Interface */}
         <Grid item xs={12} md={6}>
           <Paper elevation={3} sx={{ p: 3, minHeight: '400px', display: 'flex', flexDirection: 'column' }}>
-            <Typography variant="h5" gutterBottom>
-              Interactive Analysis
-            </Typography>
-            <Box sx={{ 
-              flexGrow: 1, 
-              overflowY: 'auto', 
-              mb: 2,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 1
-            }}>
-              {messages.map((message, index) => (
-                <Box
-                  key={index}
-                  sx={{
-                    p: 1,
-                    borderRadius: 1,
-                    maxWidth: '80%',
-                    alignSelf: message.type === 'answer' ? 'flex-end' : 'flex-start',
-                    bgcolor: message.type === 'question' 
-                      ? 'primary.light'
-                      : message.type === 'answer'
-                      ? 'secondary.light'
-                      : 'grey.300',
-                    color: message.type === 'question' || message.type === 'answer' 
-                      ? 'white' 
-                      : 'text.primary'
-                  }}
-                >
-                  <Typography>{message.text}</Typography>
-                </Box>
-              ))}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h5">Interactive Analysis</Typography>
+              <Button 
+                variant="outlined" 
+                onClick={() => setShowHistory(!showHistory)}
+                size="small"
+              >
+                {showHistory ? 'Hide History' : 'Show History'}
+              </Button>
             </Box>
-            {!isAnalyzing && (
-              <Box component="form" onSubmit={handleInputSubmit} sx={{ display: 'flex', gap: 1 }}>
-                <TextField
-                  fullWidth
-                  value={currentInput}
-                  onChange={(e) => setCurrentInput(e.target.value)}
-                  placeholder="Type your answer..."
-                  size="small"
-                />
-                <Button type="submit" variant="contained">
-                  Send
-                </Button>
-              </Box>
-            )}
-            {isAnalyzing && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                <Button variant="outlined" onClick={handleReset}>
-                  Start New Analysis
-                </Button>
+            {!showHistory ? (
+              <>
+                <Box sx={{ 
+                  flexGrow: 1, 
+                  overflowY: 'auto', 
+                  mb: 2,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 1
+                }}>
+                  {messages.map((message, index) => (
+                    <Box
+                      key={index}
+                      sx={{
+                        p: 1,
+                        borderRadius: 1,
+                        maxWidth: '80%',
+                        alignSelf: message.type === 'answer' ? 'flex-end' : 'flex-start',
+                        bgcolor: message.type === 'question' 
+                          ? 'primary.light'
+                          : message.type === 'answer'
+                          ? 'secondary.light'
+                          : 'grey.300',
+                        color: message.type === 'question' || message.type === 'answer' 
+                          ? 'white' 
+                          : 'text.primary'
+                      }}
+                    >
+                      <Typography>{message.text}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+                {!isAnalyzing && (
+                  <Box component="form" onSubmit={handleInputSubmit} sx={{ display: 'flex', gap: 1 }}>
+                    <TextField
+                      fullWidth
+                      value={currentInput}
+                      onChange={(e) => setCurrentInput(e.target.value)}
+                      placeholder="Type your answer..."
+                      size="small"
+                    />
+                    <Button type="submit" variant="contained">
+                      Send
+                    </Button>
+                  </Box>
+                )}
+                {isAnalyzing && (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                    <Button variant="outlined" onClick={handleReset}>
+                      Start New Analysis
+                    </Button>
+                  </Box>
+                )}
+              </>
+            ) : (
+              <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
+                {history.length === 0 ? (
+                  <Typography variant="body1" color="text.secondary" align="center">
+                    No analysis history available.
+                  </Typography>
+                ) : (
+                  history.map((item, index) => (
+                    <Paper 
+                      key={item.timestamp} 
+                      sx={{ 
+                        p: 2, 
+                        mb: 2, 
+                        border: '1px solid',
+                        borderColor: 'divider'
+                      }}
+                    >
+                      <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                        {new Date(item.timestamp).toLocaleString()}
+                      </Typography>
+                      <Typography variant="body2" gutterBottom>
+                        Position: {item.input_data.Position}
+                      </Typography>
+                      <Typography variant="body2" gutterBottom>
+                        Investors: {item.input_data.Number_of_Investor}
+                      </Typography>
+                      <Typography variant="body2" gutterBottom>
+                        First Round: {item.input_data.IsFirst ? 'Yes' : 'No'}
+                      </Typography>
+                      <Typography variant="body2" gutterBottom>
+                        Last Round: {item.input_data.IsLast ? 'Yes' : 'No'}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        {item.message}
+                      </Typography>
+                      {item.image && (
+                        <Box sx={{ mt: 2 }}>
+                          <img
+                            src={item.image}
+                            alt="Analysis Result"
+                            style={{ maxWidth: '100%', height: 'auto' }}
+                          />
+                        </Box>
+                      )}
+                    </Paper>
+                  ))
+                )}
               </Box>
             )}
           </Paper>
