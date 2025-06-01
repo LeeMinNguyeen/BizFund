@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  backend:
+    image: your-registry/bizfund-backend:latest
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - CORS_ORIGINS=https://your-domain.com
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    image: your-registry/bizfund-frontend:latest
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=https://api.your-domain.com
+      - NODE_ENV=production
+    depends_on:
+      backend:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3" 

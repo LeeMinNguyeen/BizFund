@@ -1,7 +1,73 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import base64
+from PIL import Image, ImageDraw
+import io
 
 app = FastAPI()
 
-@app.get("/")
-async def root():
-    return {"message": "Hello World"}
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with specific origin
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class AnalysisInput(BaseModel):
+    Position: str
+    Number_of_Investor: int
+    IsFirst: bool
+    IsLast: bool
+
+def create_sample_image(position: str, number: int, is_first: bool, is_last: bool) -> str:
+    # Create a simple image based on the inputs
+    img = Image.new('RGB', (400, 200), color='white')
+    draw = ImageDraw.Draw(img)
+    
+    # Draw some text and shapes based on the inputs
+    draw.text((10, 10), f"Position: {position}", fill='black')
+    draw.text((10, 30), f"Investors: {number}", fill='black')
+    draw.text((10, 50), f"First Round: {is_first}", fill='black')
+    draw.text((10, 70), f"Last Round: {is_last}", fill='black')
+    
+    # Draw a rectangle if it's first round
+    if is_first:
+        draw.rectangle([50, 100, 150, 150], outline='blue')
+    
+    # Draw a circle if it's last round
+    if is_last:
+        draw.ellipse([200, 100, 250, 150], outline='red')
+    
+    # Convert the image to base64
+    buffered = io.BytesIO()
+    img.save(buffered, format="PNG")
+    img_str = base64.b64encode(buffered.getvalue()).decode()
+    
+    return f"data:image/png;base64,{img_str}"
+
+@app.post("/analyze")
+async def analyze_data(data: AnalysisInput):
+    # Generate a sample image based on the inputs
+    image = create_sample_image(
+        data.Position,
+        data.Number_of_Investor,
+        data.IsFirst,
+        data.IsLast
+    )
+    
+    # Create a sample message
+    message = f"Analysis complete! Position '{data.Position}' has {data.Number_of_Investor} investors."
+    if data.IsFirst:
+        message += " This is the first investment round."
+    elif data.IsLast:
+        message += " This is the last investment round."
+    else:
+        message += " This is an intermediate investment round."
+    
+    return {
+        "image": image,
+        "message": message
+    }
