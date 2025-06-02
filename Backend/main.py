@@ -22,6 +22,7 @@ app.add_middleware(
 
 class AnalysisInput(BaseModel):
     Position: str
+    Education: str
     Number_of_Investor: int
     IsFirst: bool
     IsLast: bool
@@ -57,16 +58,17 @@ def save_analysis(analysis: AnalysisOutput):
     except Exception as e:
         print(f"Error saving analysis: {e}")
 
-def create_sample_image(position: str, number: int, is_first: bool, is_last: bool) -> str:
+def create_sample_image(position: str, education: str, number: int, is_first: bool, is_last: bool) -> str:
     # Create a simple image based on the inputs
     img = Image.new('RGB', (400, 200), color='white')
     draw = ImageDraw.Draw(img)
     
     # Draw some text and shapes based on the inputs
     draw.text((10, 10), f"Position: {position}", fill='black')
-    draw.text((10, 30), f"Investors: {number}", fill='black')
-    draw.text((10, 50), f"First Round: {is_first}", fill='black')
-    draw.text((10, 70), f"Last Round: {is_last}", fill='black')
+    draw.text((10, 30), f"Education: {education}", fill='black')
+    draw.text((10, 50), f"Investors: {number}", fill='black')
+    draw.text((10, 70), f"First Round: {is_first}", fill='black')
+    draw.text((10, 90), f"Last Round: {is_last}", fill='black')
     
     # Draw a rectangle if it's first round
     if is_first:
@@ -88,6 +90,7 @@ async def analyze_data(data: AnalysisInput):
     # Generate a sample image based on the inputs
     image = create_sample_image(
         data.Position,
+        data.Education,
         data.Number_of_Investor,
         data.IsFirst,
         data.IsLast
