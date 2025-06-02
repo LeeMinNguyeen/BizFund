@@ -22,6 +22,7 @@ app.add_middleware(
 
 class AnalysisInput(BaseModel):
     Position: str
+    Education: str
     Number_of_Investor: int
     IsFirst: bool
     IsLast: bool
@@ -57,6 +58,7 @@ def save_analysis(analysis: AnalysisOutput):
     except Exception as e:
         print(f"Error saving analysis: {e}")
 
+<<<<<<< HEAD
 def create_sample_image(position: str, number: int, is_first: bool, is_last: bool) -> str:
     # Set up image parameters
     bar_height = 30
@@ -101,6 +103,28 @@ def create_sample_image(position: str, number: int, is_first: bool, is_last: boo
                 img.putpixel((x + dx, dy + row_spacing // 2), color)
         x += pixel
 
+=======
+def create_sample_image(position: str, education: str, number: int, is_first: bool, is_last: bool) -> str:
+    # Create a simple image based on the inputs
+    img = Image.new('RGB', (400, 200), color='white')
+    draw = ImageDraw.Draw(img)
+    
+    # Draw some text and shapes based on the inputs
+    draw.text((10, 10), f"Position: {position}", fill='black')
+    draw.text((10, 30), f"Education: {education}", fill='black')
+    draw.text((10, 50), f"Investors: {number}", fill='black')
+    draw.text((10, 70), f"First Round: {is_first}", fill='black')
+    draw.text((10, 90), f"Last Round: {is_last}", fill='black')
+    
+    # Draw a rectangle if it's first round
+    if is_first:
+        draw.rectangle([50, 100, 150, 150], outline='blue')
+    
+    # Draw a circle if it's last round
+    if is_last:
+        draw.ellipse([200, 100, 250, 150], outline='red')
+    
+>>>>>>> 4102d24d0494939b78d4f89df61f2654999697e0
     # Convert the image to base64
     buffered = io.BytesIO()
     img.save(buffered, format="PNG")
@@ -113,6 +137,7 @@ async def analyze_data(data: AnalysisInput):
     # Generate a sample image based on the inputs
     image = create_sample_image(
         data.Position,
+        data.Education,
         data.Number_of_Investor,
         data.IsFirst,
         data.IsLast

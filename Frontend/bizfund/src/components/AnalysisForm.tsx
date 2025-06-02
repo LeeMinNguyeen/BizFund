@@ -29,6 +29,7 @@ interface HistoryItem {
     Number_of_Investor: number;
     IsFirst: boolean;
     IsLast: boolean;
+    Education: string;
   };
 }
 
@@ -39,6 +40,7 @@ interface Message {
 
 const questions = [
   'What is your title/position?',
+  'What is your highest education level?',
   'How many investors are involved?',
   'Is this the first investment round? (yes/no)',
   'Is this the last investment round? (yes/no)',
@@ -46,6 +48,7 @@ const questions = [
 
 export default function AnalysisForm() {
   const [titlePosition, setTitlePosition] = useState('');
+  const [education, setEducation] = useState('');
   const [investorCount, setInvestorCount] = useState<number>(0);
   const [isFirstRound, setIsFirstRound] = useState<boolean | null>(null);
   const [isLastRound, setIsLastRound] = useState<boolean | null>(null);
@@ -89,6 +92,9 @@ export default function AnalysisForm() {
         setTitlePosition(currentInput);
         break;
       case 1:
+        setEducation(currentInput);
+        break;
+      case 2:
         const num = parseInt(currentInput);
         if (isNaN(num) || num < 0) {
           setMessages([...newMessages, { 
@@ -100,7 +106,7 @@ export default function AnalysisForm() {
         }
         setInvestorCount(num);
         break;
-      case 2:
+      case 3:
         if (!['yes', 'no'].includes(currentInput.toLowerCase())) {
           setMessages([...newMessages, { 
             text: 'Please answer with yes or no', 
@@ -114,9 +120,9 @@ export default function AnalysisForm() {
         
         if (!isFirst) {
           // Only ask about last round if it's not the first round
-          newMessages.push({ text: questions[3], type: 'question' as const });
+          newMessages.push({ text: questions[4], type: 'question' as const });
           setMessages(newMessages);
-          setCurrentQuestion(3);
+          setCurrentQuestion(4);
         } else {
           // If it's the first round, set isLastRound to false and proceed to analysis
           setIsLastRound(false);
@@ -125,6 +131,7 @@ export default function AnalysisForm() {
           try {
             const response = await axios.post('http://localhost:8000/analyze', {
               Position: titlePosition,
+              Education: education,
               Number_of_Investor: investorCount,
               IsFirst: true,
               IsLast: false,
@@ -145,7 +152,7 @@ export default function AnalysisForm() {
         }
         setCurrentInput('');
         return;
-      case 3:
+      case 4:
         if (!['yes', 'no'].includes(currentInput.toLowerCase())) {
           setMessages([...newMessages, { 
             text: 'Please answer with yes or no', 
@@ -162,6 +169,7 @@ export default function AnalysisForm() {
         try {
           const response = await axios.post('http://localhost:8000/analyze', {
             Position: titlePosition,
+            Education: education,
             Number_of_Investor: investorCount,
             IsFirst: false,
             IsLast: isLast,
@@ -183,8 +191,8 @@ export default function AnalysisForm() {
         return;
     }
 
-    // Move to next question for cases 0 and 1 only
-    if (currentQuestion < 2) {
+    // Move to next question for cases 0, 1 and 2 only
+    if (currentQuestion < 3) {
       newMessages.push({ text: questions[currentQuestion + 1], type: 'question' as const });
       setMessages(newMessages);
       setCurrentQuestion(prev => prev + 1);
@@ -195,6 +203,7 @@ export default function AnalysisForm() {
 
   const handleReset = () => {
     setTitlePosition('');
+    setEducation('');
     setInvestorCount(0);
     setIsFirstRound(null);
     setIsLastRound(null);
@@ -299,6 +308,9 @@ export default function AnalysisForm() {
                       </Typography>
                       <Typography variant="body2" gutterBottom>
                         Position: {item.input_data.Position}
+                      </Typography>
+                      <Typography variant="body2" gutterBottom>
+                        Education: {item.input_data.Education}
                       </Typography>
                       <Typography variant="body2" gutterBottom>
                         Investors: {item.input_data.Number_of_Investor}
