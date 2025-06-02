@@ -3,3 +3,12 @@ uvicorn==0.27.0
 pillow==10.2.0
 python-multipart==0.0.9
 pydantic==2.6.0 
+albumentations
+pandas
+numpy
+opencv-python
+torch
+scikit-learn
+matplotlib
+tqdm
+albumentations[torch]

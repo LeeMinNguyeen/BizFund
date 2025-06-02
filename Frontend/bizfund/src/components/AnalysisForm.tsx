@@ -1,18 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   TextField,
   Typography,
-  Container,
   Paper,
   Button,
+  Container,
+  Grid
 } from '@mui/material';
-import Grid from '@mui/material/Grid';
 import type { Theme } from '@mui/material/styles';
 import type { SxProps } from '@mui/system';
-import type { GridProps } from '@mui/material';
 import axios from 'axios';
 
 interface AnalysisResult {
@@ -59,6 +58,9 @@ export default function AnalysisForm() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [leftWidth, setLeftWidth] = useState(50); // percentage
+  const isDragging = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Add initial question
@@ -216,160 +218,322 @@ export default function AnalysisForm() {
     fetchHistory();
   };
 
-  return (
-    <Container maxWidth="lg" sx={{ mt: 4 }}>
-      <Grid container spacing={4}>
-        {/* Left side - Chat Interface */}
-        <Grid item xs={12} md={6}>
-          <Paper elevation={3} sx={{ p: 3, minHeight: '400px', display: 'flex', flexDirection: 'column' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h5">Interactive Analysis</Typography>
-              <Button 
-                variant="outlined" 
-                onClick={() => setShowHistory(!showHistory)}
-                size="small"
-              >
-                {showHistory ? 'Hide History' : 'Show History'}
-              </Button>
-            </Box>
-            {!showHistory ? (
-              <>
-                <Box sx={{ 
-                  flexGrow: 1, 
-                  overflowY: 'auto', 
-                  mb: 2,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 1
-                }}>
-                  {messages.map((message, index) => (
-                    <Box
-                      key={index}
-                      sx={{
-                        p: 1,
-                        borderRadius: 1,
-                        maxWidth: '80%',
-                        alignSelf: message.type === 'answer' ? 'flex-end' : 'flex-start',
-                        bgcolor: message.type === 'question' 
-                          ? 'primary.light'
-                          : message.type === 'answer'
-                          ? 'secondary.light'
-                          : 'grey.300',
-                        color: message.type === 'question' || message.type === 'answer' 
-                          ? 'white' 
-                          : 'text.primary'
-                      }}
-                    >
-                      <Typography>{message.text}</Typography>
-                    </Box>
-                  ))}
-                </Box>
-                {!isAnalyzing && (
-                  <Box component="form" onSubmit={handleInputSubmit} sx={{ display: 'flex', gap: 1 }}>
-                    <TextField
-                      fullWidth
-                      value={currentInput}
-                      onChange={(e) => setCurrentInput(e.target.value)}
-                      placeholder="Type your answer..."
-                      size="small"
-                    />
-                    <Button type="submit" variant="contained">
-                      Send
-                    </Button>
-                  </Box>
-                )}
-                {isAnalyzing && (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                    <Button variant="outlined" onClick={handleReset}>
-                      Start New Analysis
-                    </Button>
-                  </Box>
-                )}
-              </>
-            ) : (
-              <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
-                {history.length === 0 ? (
-                  <Typography variant="body1" color="text.secondary" align="center">
-                    No analysis history available.
-                  </Typography>
-                ) : (
-                  history.map((item, index) => (
-                    <Paper 
-                      key={item.timestamp} 
-                      sx={{ 
-                        p: 2, 
-                        mb: 2, 
-                        border: '1px solid',
-                        borderColor: 'divider'
-                      }}
-                    >
-                      <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                        {new Date(item.timestamp).toLocaleString()}
-                      </Typography>
-                      <Typography variant="body2" gutterBottom>
-                        Position: {item.input_data.Position}
-                      </Typography>
-                      <Typography variant="body2" gutterBottom>
-                        Education: {item.input_data.Education}
-                      </Typography>
-                      <Typography variant="body2" gutterBottom>
-                        Investors: {item.input_data.Number_of_Investor}
-                      </Typography>
-                      <Typography variant="body2" gutterBottom>
-                        First Round: {item.input_data.IsFirst ? 'Yes' : 'No'}
-                      </Typography>
-                      <Typography variant="body2" gutterBottom>
-                        Last Round: {item.input_data.IsLast ? 'Yes' : 'No'}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        {item.message}
-                      </Typography>
-                      {item.image && (
-                        <Box sx={{ mt: 2 }}>
-                          <img
-                            src={item.image}
-                            alt="Analysis Result"
-                            style={{ maxWidth: '100%', height: 'auto' }}
-                          />
-                        </Box>
-                      )}
-                    </Paper>
-                  ))
-                )}
-              </Box>
-            )}
-          </Paper>
-        </Grid>
+  useEffect(() => {
+    if (result) {
+      setMessages(prev => [
+        ...prev,
+        { text: result.message, type: 'system' as const },
+      ]);
+    }
+  }, [result]);
 
-        {/* Right side - Results */}
-        <Grid item xs={12} md={6}>
-          <Paper elevation={3} sx={{ p: 3, minHeight: '400px' }}>
-            <Typography variant="h5" gutterBottom>
-              Analysis Results
-            </Typography>
-            {result ? (
-              <Box>
-                {result.image && (
-                  <Box sx={{ mb: 2 }}>
-                    <img
-                      src={result.image}
-                      alt="Analysis Result"
-                      style={{ maxWidth: '100%', height: 'auto' }}
-                    />
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isDragging.current || !containerRef.current) return;
+    
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const containerWidth = containerRect.width;
+    const mouseX = e.clientX - containerRect.left;
+    
+    // Calculate percentage (constrain between 30% and 70%)
+    const newLeftWidth = Math.min(Math.max((mouseX / containerWidth) * 100, 30), 70);
+    setLeftWidth(newLeftWidth);
+  };
+
+  const handleMouseUp = () => {
+    isDragging.current = false;
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+  };
+
+  // Cleanup event listeners
+  useEffect(() => {
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  return (
+    <Box sx={{ 
+      minHeight: '100vh',
+      bgcolor: 'background.default',
+      py: 4
+    }}>
+      <Container maxWidth="xl">
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            p: 3,
+            minHeight: 'calc(100vh - 64px)',
+            display: 'flex',
+            flexDirection: 'column'
+          }}
+        >
+          <Box
+            ref={containerRef}
+            sx={{
+              display: 'flex',
+              flexDirection: 'row',
+              position: 'relative',
+              height: '100%'
+            }}
+          >
+            {/* Left side - Chat Interface */}
+            <Box
+              sx={{
+                width: `${leftWidth}%`,
+                height: '100%',
+                pr: 2,
+                overflow: 'hidden'
+              }}
+            >
+              <Box sx={{ 
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h5">Interactive Analysis</Typography>
+                  <Button 
+                    variant="outlined" 
+                    onClick={() => setShowHistory(!showHistory)}
+                    size="small"
+                  >
+                    {showHistory ? 'Hide History' : 'Show History'}
+                  </Button>
+                </Box>
+                {!showHistory ? (
+                  <>
+                    <Box sx={{ 
+                      flexGrow: 1, 
+                      overflowY: 'auto', 
+                      mb: 2,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 1,
+                      maxHeight: 'calc(100vh - 200px)'
+                    }}>
+                      {messages.map((message, index) => (
+                        <Box
+                          key={index}
+                          sx={{
+                            p: 1,
+                            borderRadius: 1,
+                            maxWidth: '80%',
+                            alignSelf: message.type === 'answer' ? 'flex-end' : 'flex-start',
+                            bgcolor: message.type === 'question' 
+                              ? 'primary.light'
+                              : message.type === 'answer'
+                              ? 'secondary.light'
+                              : 'grey.300',
+                            color: message.type === 'question' || message.type === 'answer' 
+                              ? 'white' 
+                              : 'text.primary'
+                          }}
+                        >
+                          <Typography>{message.text}</Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                    {!isAnalyzing && (
+                      <Box component="form" onSubmit={handleInputSubmit} sx={{ display: 'flex', gap: 1 }}>
+                        <TextField
+                          fullWidth
+                          value={currentInput}
+                          onChange={(e) => setCurrentInput(e.target.value)}
+                          placeholder="Type your answer..."
+                          size="small"
+                        />
+                        <Button type="submit" variant="contained">
+                          Send
+                        </Button>
+                      </Box>
+                    )}
+                    {isAnalyzing && (
+                      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                        <Button variant="outlined" onClick={handleReset}>
+                          Start New Analysis
+                        </Button>
+                      </Box>
+                    )}
+                  </>
+                ) : (
+                  <Box sx={{ 
+                    flexGrow: 1, 
+                    overflowY: 'auto',
+                    maxHeight: 'calc(100vh - 200px)'
+                  }}>
+                    {history.length === 0 ? (
+                      <Typography variant="body1" color="text.secondary" align="center">
+                        No analysis history available.
+                      </Typography>
+                    ) : (
+                      history.map((item) => (
+                        <Paper 
+                          key={item.timestamp} 
+                          sx={{ 
+                            p: 2, 
+                            mb: 2, 
+                            border: '1px solid',
+                            borderColor: 'divider'
+                          }}
+                        >
+                          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                            {new Date(item.timestamp).toLocaleString()}
+                          </Typography>
+                          <Typography variant="body2" gutterBottom>
+                            Position: {item.input_data.Position}
+                          </Typography>
+                          <Typography variant="body2" gutterBottom>
+                            Education: {item.input_data.Education}
+                          </Typography>
+                          <Typography variant="body2" gutterBottom>
+                            Investors: {item.input_data.Number_of_Investor}
+                          </Typography>
+                          <Typography variant="body2" gutterBottom>
+                            First Round: {item.input_data.IsFirst ? 'Yes' : 'No'}
+                          </Typography>
+                          <Typography variant="body2" gutterBottom>
+                            Last Round: {item.input_data.IsLast ? 'Yes' : 'No'}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                            {item.message}
+                          </Typography>
+                          {item.image && (
+                            <Box sx={{ mt: 2 }}>
+                              <img
+                                src={item.image}
+                                alt="Analysis Result"
+                                style={{ width: '100%', height: 'auto' }}
+                              />
+                            </Box>
+                          )}
+                        </Paper>
+                      ))
+                    )}
                   </Box>
                 )}
-                {result.message && (
-                  <Typography variant="body1">{result.message}</Typography>
+              </Box>
+            </Box>
+
+            {/* Resizer */}
+            <Box
+              sx={{
+                position: 'absolute',
+                left: `${leftWidth}%`,
+                top: 0,
+                bottom: 0,
+                width: '10px',
+                transform: 'translateX(-50%)',
+                cursor: 'col-resize',
+                backgroundColor: 'transparent',
+                '&:hover': {
+                  '&::after': {
+                    backgroundColor: 'primary.main',
+                  }
+                },
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  left: '50%',
+                  top: 0,
+                  bottom: 0,
+                  width: '4px',
+                  transform: 'translateX(-50%)',
+                  backgroundColor: 'divider',
+                  transition: 'background-color 0.2s'
+                },
+                // Improve touch handling
+                '@media (pointer: coarse)': {
+                  width: '20px',
+                  '&::after': {
+                    width: '6px',
+                  }
+                }
+              }}
+              onMouseDown={handleMouseDown}
+            />
+
+            {/* Right side - Results */}
+            <Box
+              sx={{
+                width: `${100 - leftWidth}%`,
+                height: '100%',
+                pl: 2,
+                overflow: 'hidden'
+              }}
+            >
+              <Box sx={{ 
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
+                <Typography variant="h5" gutterBottom>
+                  Analysis Results
+                </Typography>
+                {result ? (
+                  <Box sx={{ 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    gap: 4,
+                    maxHeight: 'calc(100vh - 200px)',
+                    overflowY: 'auto',
+                    py: 2
+                  }}>
+                    {result.image && (
+                      <Box sx={{
+                        width: '100%',
+                        minHeight: '300px', // Set minimum height
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        bgcolor: 'background.paper',
+                        borderRadius: 1,
+                        p: 3,
+                        boxShadow: 1
+                      }}>
+                        <img
+                          src={result.image}
+                          alt="Analysis Result"
+                          style={{ 
+                            maxWidth: '100%',
+                            maxHeight: '500px', // Increased max height
+                            height: 'auto',
+                            objectFit: 'contain'
+                          }}
+                        />
+                      </Box>
+                    )}
+                    {result.message && (
+                      <Box sx={{
+                        p: 3,
+                        bgcolor: 'background.paper',
+                        borderRadius: 1,
+                        boxShadow: 1
+                      }}>
+                        <Typography variant="body1" sx={{ fontSize: '1.1rem', lineHeight: 1.6 }}>
+                          {result.message}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                ) : (
+                  <Typography variant="body1" color="text.secondary">
+                    {isAnalyzing ? 'Analyzing...' : 'Please answer all questions to see the analysis results.'}
+                  </Typography>
                 )}
               </Box>
-            ) : (
-              <Typography variant="body1" color="text.secondary">
-                {isAnalyzing ? 'Analyzing...' : 'Please answer all questions to see the analysis results.'}
-              </Typography>
-            )}
-          </Paper>
-        </Grid>
-      </Grid>
-    </Container>
+            </Box>
+          </Box>
+        </Paper>
+      </Container>
+    </Box>
   );
-} 
+}

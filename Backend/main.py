@@ -8,6 +8,7 @@ import json
 from datetime import datetime
 import os
 from typing import List, Optional
+import unetpp
 
 app = FastAPI()
 
@@ -56,10 +57,41 @@ def save_analysis(analysis: AnalysisOutput):
         with open(STORAGE_FILE, "w") as f:
             json.dump(stored.dict(), f, indent=2)
     except Exception as e:
-        print(f"Error saving analysis: {e}")
+        print(f"Error saving analysis: {e}") 
 
-<<<<<<< HEAD
-def create_sample_image(position: str, number: int, is_first: bool, is_last: bool) -> str:
+def unetpp_funding_model_predict(input_data: AnalysisInput, image: list) -> str:
+    """Use UNet++ model to predict funding round from generated image."""
+    try:
+        # Get the image file path from the create_image return value
+        image_path = f"./image/{image[1]}"  # image[1] contains the filename
+        
+        # Run prediction using the UNet++ model
+        prediction_index = unetpp.predict(image_path)
+        
+        # Convert prediction index to funding round label
+        label_map = {'angel': 0, 'seed': 1, 'a': 2, 'b': 3, 'c': 4}
+        reverse_label_map = {v: k for k, v in label_map.items()}
+        funding_round = reverse_label_map.get(prediction_index, "unknown")
+        
+        # Format the output message
+        if funding_round == "angel":
+            return "Angel Investment"
+        elif funding_round == "seed":
+            return "Seed Funding"
+        elif funding_round == "a":
+            return "Series A"
+        elif funding_round == "b":
+            return "Series B" 
+        elif funding_round == "c":
+            return "Series C"
+        else:
+            return "Unknown Funding Round"
+            
+    except Exception as e:
+        print(f"Error in model prediction: {e}")
+        return "Prediction Error - Using default Series A"
+
+def create_image(position: str, education: str, number: int, is_first: bool, is_last: bool) -> list:
     # Set up image parameters
     bar_height = 30
     row_spacing = 10
@@ -68,6 +100,7 @@ def create_sample_image(position: str, number: int, is_first: bool, is_last: boo
     # Prepare data for one row (simulate a group)
     fields = [
         ("Position", "Position_pixel"),
+        ("Education", "Education_pixel"),
         ("Investors", "Investors_pixel"),
         ("First", "First_pixel"),
         ("Last", "Last_pixel"),
@@ -75,6 +108,7 @@ def create_sample_image(position: str, number: int, is_first: bool, is_last: boo
     # Assign colors for each field
     color_map = {
         "Position": (70, 130, 180),   # steelblue
+        "Education": (255, 165, 0),   # orange
         "Investors": (60, 179, 113),  # mediumseagreen
         "First": (255, 215, 0),       # gold
         "Last": (220, 20, 60),        # crimson
@@ -83,6 +117,8 @@ def create_sample_image(position: str, number: int, is_first: bool, is_last: boo
     bar = []
     # Position
     bar.append((color_map["Position"], (len(position) + 1) * scale_factor))
+    # Education
+    bar.append((color_map["Education"], (len(education) + 1) * scale_factor))
     # Investors
     bar.append((color_map["Investors"], (number + 1) * scale_factor))
     # First
@@ -103,68 +139,46 @@ def create_sample_image(position: str, number: int, is_first: bool, is_last: boo
                 img.putpixel((x + dx, dy + row_spacing // 2), color)
         x += pixel
 
-=======
-def create_sample_image(position: str, education: str, number: int, is_first: bool, is_last: bool) -> str:
-    # Create a simple image based on the inputs
-    img = Image.new('RGB', (400, 200), color='white')
-    draw = ImageDraw.Draw(img)
-    
-    # Draw some text and shapes based on the inputs
-    draw.text((10, 10), f"Position: {position}", fill='black')
-    draw.text((10, 30), f"Education: {education}", fill='black')
-    draw.text((10, 50), f"Investors: {number}", fill='black')
-    draw.text((10, 70), f"First Round: {is_first}", fill='black')
-    draw.text((10, 90), f"Last Round: {is_last}", fill='black')
-    
-    # Draw a rectangle if it's first round
-    if is_first:
-        draw.rectangle([50, 100, 150, 150], outline='blue')
-    
-    # Draw a circle if it's last round
-    if is_last:
-        draw.ellipse([200, 100, 250, 150], outline='red')
-    
->>>>>>> 4102d24d0494939b78d4f89df61f2654999697e0
+    # Save image with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    image_name = f"image_{timestamp}.png"
+    img.save(f"./image/{image_name}", format="PNG")
+
     # Convert the image to base64
     buffered = io.BytesIO()
     img.save(buffered, format="PNG")
     img_str = base64.b64encode(buffered.getvalue()).decode()
 
-    return f"data:image/png;base64,{img_str}"
+    return_image = [f"data:image/png;base64,{img_str}", image_name]
+    return return_image
 
 @app.post("/analyze")
 async def analyze_data(data: AnalysisInput):
     # Generate a sample image based on the inputs
-    image = create_sample_image(
+    image = create_image(
         data.Position,
         data.Education,
         data.Number_of_Investor,
         data.IsFirst,
         data.IsLast
     )
-    
-    # Create a sample message
-    message = f"Analysis complete! Position '{data.Position}' has {data.Number_of_Investor} investors."
-    if data.IsFirst:
-        message += " This is the first investment round."
-    elif data.IsLast:
-        message += " This is the last investment round."
-    else:
-        message += " This is an intermediate investment round."
-    
+
+    # Use the UNet++ model to predict the funding round
+    message = unetpp_funding_model_predict(data, image)
+
     # Create analysis output
     output = AnalysisOutput(
-        image=image,
+        image=image[0],
         message=message,
         timestamp=datetime.now().isoformat(),
         input_data=data
     )
-    
+
     # Save the analysis
     save_analysis(output)
-    
+
     return {
-        "image": image,
+        "image": image[0],
         "message": message
     }
 
