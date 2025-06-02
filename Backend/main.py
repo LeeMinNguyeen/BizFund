@@ -57,7 +57,7 @@ def save_analysis(analysis: AnalysisOutput):
         with open(STORAGE_FILE, "w") as f:
             json.dump(stored.dict(), f, indent=2)
     except Exception as e:
-        print(f"Error saving analysis: {e}") 
+        print(f"Error saving analysis: {e}")
 
 def unetpp_funding_model_predict(input_data: AnalysisInput, image: list) -> str:
     """Use UNet++ model to predict funding round from generated image."""
@@ -93,9 +93,9 @@ def unetpp_funding_model_predict(input_data: AnalysisInput, image: list) -> str:
 
 def create_image(position: str, education: str, number: int, is_first: bool, is_last: bool) -> list:
     # Set up image parameters
-    bar_height = 30
+    bar_height = 50
     row_spacing = 10
-    scale_factor = 30  # scale for bar width
+    scale_factor = 40  # scale for bar width
 
     # Prepare data for one row (simulate a group)
     fields = [
@@ -105,26 +105,27 @@ def create_image(position: str, education: str, number: int, is_first: bool, is_
         ("First", "First_pixel"),
         ("Last", "Last_pixel"),
     ]
-    # Assign colors for each field
+    # Assign deeper colors for each field
     color_map = {
-        "Position": (70, 130, 180),   # steelblue
-        "Education": (255, 165, 0),   # orange
-        "Investors": (60, 179, 113),  # mediumseagreen
-        "First": (255, 215, 0),       # gold
-        "Last": (220, 20, 60),        # crimson
+        "Position": (255, 140, 0),   # dark orange
+        "Education": (165, 42, 42), # brownish red
+        "Investors": (0, 100, 0), # darker green
+        "First": (128, 0, 128),      # purple
+        "Last": (255, 105, 180),     # pink
     }
     # Prepare bar data
     bar = []
-    # Position
-    bar.append((color_map["Position"], (len(position) + 1) * scale_factor))
     # Education
     bar.append((color_map["Education"], (len(education) + 1) * scale_factor))
+    # Position
+    bar.append((color_map["Position"], (len(position) + 1) * scale_factor))
+    # Last
+    bar.append((color_map["Last"], (2 if is_last else 1) * scale_factor))
     # Investors
     bar.append((color_map["Investors"], (number + 1) * scale_factor))
     # First
-    bar.append((color_map["First"], (1 if is_first else 0) * scale_factor))
-    # Last
-    bar.append((color_map["Last"], (1 if is_last else 0) * scale_factor))
+    bar.append((color_map["First"], (2 if is_first else 1) * scale_factor))
+
 
     # Calculate image size
     img_width = sum(pixel for _, pixel in bar) if bar else 400
