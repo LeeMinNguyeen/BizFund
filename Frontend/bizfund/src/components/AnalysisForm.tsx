@@ -500,35 +500,50 @@ export default function AnalysisForm() {
                         p: 3,
                         boxShadow: 1
                       }}>
-                        <img
+                        {result.image ? (
+                          <img
                           src={result.image}
-                          alt="Analysis Result"
-                          style={{ 
-                            maxWidth: '100%',
-                            maxHeight: '500px',
-                            height: 'auto',
-                            objectFit: 'contain'
-                          }}
-                        />
+                          alt="Predictive Analysis Result"
+                          style={{ maxWidth: '100%', maxHeight: '100%' }}
+                          />
+                        ) : (
+                          <Typography variant="body1" color="text.secondary">
+                          No image available for the result.
+                          </Typography>
+                        )}
                       </Box>
                     )}
-                    {result.message && (
+                    {result && (
                       <Box sx={{
-                        p: 4,
+                        mt: 2,
+                        p: 2,
                         bgcolor: 'background.paper',
-                        borderRadius: 2,
+                        borderRadius: 1,
                         boxShadow: 1,
-                        textAlign: 'center'
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-start'
                       }}>
-                        <Typography 
-                          variant="h4" 
-                          sx={{ 
-                            fontWeight: 600,
-                            color: 'primary.main',
-                            mb: 2
-                          }}
-                        >
-                          {result.message}
+                        <Typography variant="h6" gutterBottom>
+                          Input Data and Points
+                        </Typography>
+                        <Typography variant="body2" style={{ color: 'brown'}}>
+                          Education: {education} (Points: 6)
+                        </Typography>
+                        <Typography variant="body2" style={{ color: 'darkorange'}}>
+                          Position: {titlePosition} (Points: 7)
+                        </Typography>
+                        <Typography variant="body2" style={{ color: 'purple',}}>
+                          First Round: {isFirstRound ? 'Yes' : 'No'} (Points: 2)
+                        </Typography>
+                        <Typography variant="body2" style={{ color: 'darkgreen'}}>
+                          Number of Investors: {investorCount} (Points: {investorCount})
+                        </Typography>
+                        <Typography variant="body2" style={{ color: 'pink',}}>
+                          Last Round: {isLastRound ? 'Yes' : 'No'} (Points: 1)
+                        </Typography>
+                        <Typography variant="body2" style={{ color: 'black'}}>
+                          Predictive Result: {result.message}
                         </Typography>
                       </Box>
                     )}
