@@ -55,7 +55,6 @@ export default function AnalysisForm() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentInput, setCurrentInput] = useState('');
   const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [leftWidth, setLeftWidth] = useState(50); // percentage
@@ -117,43 +116,8 @@ export default function AnalysisForm() {
           setCurrentInput('');
           return;
         }
-        const isFirst = currentInput.toLowerCase() === 'yes';
-        setIsFirstRound(isFirst);
-        
-        if (!isFirst) {
-          // Only ask about last round if it's not the first round
-          newMessages.push({ text: questions[4], type: 'question' as const });
-          setMessages(newMessages);
-          setCurrentQuestion(4);
-        } else {
-          // If it's the first round, set isLastRound to false and proceed to analysis
-          setIsLastRound(false);
-          setMessages([...newMessages, { text: 'Processing your answers...', type: 'system' as const }]);
-          setIsAnalyzing(true);
-          try {
-            const response = await axios.post('http://localhost:8000/analyze', {
-              Position: titlePosition,
-              Education: education,
-              Number_of_Investor: investorCount,
-              IsFirst: true,
-              IsLast: false,
-            }, {
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              withCredentials: false
-            });
-            setResult(response.data);
-            setMessages(prev => [...prev, { text: 'Analysis complete!', type: 'system' as const }]);
-            // Fetch updated history after successful analysis
-            await fetchHistory();
-          } catch (error) {
-            console.error('Error during analysis:', error);
-            setMessages(prev => [...prev, { text: 'Error during analysis. Please try again.', type: 'system' as const }]);
-          }
-        }
-        setCurrentInput('');
-        return;
+        setIsFirstRound(currentInput.toLowerCase() === 'yes');
+        break;
       case 4:
         if (!['yes', 'no'].includes(currentInput.toLowerCase())) {
           setMessages([...newMessages, { 
@@ -163,43 +127,39 @@ export default function AnalysisForm() {
           setCurrentInput('');
           return;
         }
-        const isLast = currentInput.toLowerCase() === 'yes';
-        setIsLastRound(isLast);
-        // Proceed to analysis immediately after getting last round answer
-        setMessages([...newMessages, { text: 'Processing your answers...', type: 'system' as const }]);
-        setIsAnalyzing(true);
-        try {
-          const response = await axios.post('http://localhost:8000/analyze', {
-            Position: titlePosition,
-            Education: education,
-            Number_of_Investor: investorCount,
-            IsFirst: false,
-            IsLast: isLast,
-          }, {
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            withCredentials: false
-          });
-          setResult(response.data);
-          setMessages(prev => [...prev, { text: 'Analysis complete!', type: 'system' as const }]);
-          // Fetch updated history after successful analysis
-          await fetchHistory();
-        } catch (error) {
-          console.error('Error during analysis:', error);
-          setMessages(prev => [...prev, { text: 'Error during analysis. Please try again.', type: 'system' as const }]);
-        }
-        setCurrentInput('');
-        return;
+        setIsLastRound(currentInput.toLowerCase() === 'yes');
+        break;
     }
 
-    // Move to next question for cases 0, 1 and 2 only
-    if (currentQuestion < 3) {
+    // Move to next question if available
+    if (currentQuestion < questions.length - 1) {
       newMessages.push({ text: questions[currentQuestion + 1], type: 'question' as const });
-      setMessages(newMessages);
       setCurrentQuestion(prev => prev + 1);
     }
 
+    // Send analysis request when all questions are answered
+    if (currentQuestion === questions.length - 1) {
+      try {
+        const response = await axios.post('http://localhost:8000/analyze', {
+          Position: titlePosition,
+          Education: education,
+          Number_of_Investor: investorCount,
+          IsFirst: isFirstRound,
+          IsLast: currentInput.toLowerCase() === 'yes',
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          withCredentials: false
+        });
+        setResult(response.data);
+        await fetchHistory();
+      } catch (error) {
+        console.error('Error during analysis:', error);
+      }
+    }
+
+    setMessages(newMessages);
     setCurrentInput('');
   };
 
@@ -213,19 +173,8 @@ export default function AnalysisForm() {
     setMessages([{ text: questions[0], type: 'question' as const }]);
     setCurrentInput('');
     setResult(null);
-    setIsAnalyzing(false);
-    // Fetch updated history when resetting
     fetchHistory();
   };
-
-  useEffect(() => {
-    if (result) {
-      setMessages(prev => [
-        ...prev,
-        { text: result.message, type: 'system' as const },
-      ]);
-    }
-  }, [result]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -310,15 +259,19 @@ export default function AnalysisForm() {
                   </Button>
                 </Box>
                 {!showHistory ? (
-                  <>
+                  <Box sx={{ 
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column'
+                  }}>
+                    {/* Messages Area */}
                     <Box sx={{ 
                       flexGrow: 1, 
-                      overflowY: 'auto', 
+                      overflowY: 'auto',
                       mb: 2,
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: 1,
-                      maxHeight: 'calc(100vh - 200px)'
+                      gap: 1
                     }}>
                       {messages.map((message, index) => (
                         <Box
@@ -342,28 +295,77 @@ export default function AnalysisForm() {
                         </Box>
                       ))}
                     </Box>
-                    {!isAnalyzing && (
-                      <Box component="form" onSubmit={handleInputSubmit} sx={{ display: 'flex', gap: 1 }}>
+
+                    {/* Input Area - Fixed at Bottom */}
+                    <Box 
+                      sx={{
+                        borderTop: 1,
+                        borderColor: 'divider',
+                        pt: 2,
+                        backgroundColor: 'background.paper',
+                        position: 'sticky',
+                        bottom: 0,
+                        width: '100%'
+                      }}
+                    >
+                      <Box 
+                        component="form" 
+                        onSubmit={handleInputSubmit} 
+                        sx={{ 
+                          display: 'flex',
+                          flexDirection: { xs: 'column', sm: 'row' },
+                          gap: 2
+                        }}
+                      >
                         <TextField
                           fullWidth
                           value={currentInput}
                           onChange={(e) => setCurrentInput(e.target.value)}
                           placeholder="Type your answer..."
-                          size="small"
+                          size="medium"
+                          sx={{
+                            flexGrow: 1,
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: '8px'
+                            }
+                          }}
                         />
-                        <Button type="submit" variant="contained">
-                          Send
-                        </Button>
+                        <Box sx={{ 
+                          display: 'flex', 
+                          gap: 2,
+                          flexShrink: 0,
+                          width: { xs: '100%', sm: 'auto' }
+                        }}>
+                          <Button 
+                            type="submit" 
+                            variant="contained"
+                            sx={{
+                              minWidth: '100px',
+                              height: '40px',
+                              borderRadius: '8px',
+                              flexGrow: { xs: 1, sm: 0 }
+                            }}
+                          >
+                            Send
+                          </Button>
+                          {currentQuestion === questions.length - 1 && (
+                            <Button 
+                              variant="outlined" 
+                              onClick={handleReset}
+                              sx={{
+                                minWidth: '140px',
+                                height: '40px',
+                                borderRadius: '8px',
+                                flexGrow: { xs: 1, sm: 0 }
+                              }}
+                            >
+                              New Analysis
+                            </Button>
+                          )}
+                        </Box>
                       </Box>
-                    )}
-                    {isAnalyzing && (
-                      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                        <Button variant="outlined" onClick={handleReset}>
-                          Start New Analysis
-                        </Button>
-                      </Box>
-                    )}
-                  </>
+                    </Box>
+                  </Box>
                 ) : (
                   <Box sx={{ 
                     flexGrow: 1, 
@@ -375,9 +377,9 @@ export default function AnalysisForm() {
                         No analysis history available.
                       </Typography>
                     ) : (
-                      history.map((item) => (
+                      history.map((item: HistoryItem, index: number) => (
                         <Paper 
-                          key={item.timestamp} 
+                          key={`${item.timestamp}-${index}`}
                           sx={{ 
                             p: 2, 
                             mb: 2, 
@@ -450,7 +452,6 @@ export default function AnalysisForm() {
                   backgroundColor: 'divider',
                   transition: 'background-color 0.2s'
                 },
-                // Improve touch handling
                 '@media (pointer: coarse)': {
                   width: '20px',
                   '&::after': {
@@ -476,9 +477,9 @@ export default function AnalysisForm() {
                 flexDirection: 'column'
               }}>
                 <Typography variant="h5" gutterBottom>
-                  Analysis Results
+                  UNet++ Predictive Result
                 </Typography>
-                {result ? (
+                {result && (
                   <Box sx={{ 
                     display: 'flex', 
                     flexDirection: 'column',
@@ -490,7 +491,7 @@ export default function AnalysisForm() {
                     {result.image && (
                       <Box sx={{
                         width: '100%',
-                        minHeight: '300px', // Set minimum height
+                        minHeight: '300px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -504,7 +505,7 @@ export default function AnalysisForm() {
                           alt="Analysis Result"
                           style={{ 
                             maxWidth: '100%',
-                            maxHeight: '500px', // Increased max height
+                            maxHeight: '500px',
                             height: 'auto',
                             objectFit: 'contain'
                           }}
@@ -513,21 +514,25 @@ export default function AnalysisForm() {
                     )}
                     {result.message && (
                       <Box sx={{
-                        p: 3,
+                        p: 4,
                         bgcolor: 'background.paper',
-                        borderRadius: 1,
-                        boxShadow: 1
+                        borderRadius: 2,
+                        boxShadow: 1,
+                        textAlign: 'center'
                       }}>
-                        <Typography variant="body1" sx={{ fontSize: '1.1rem', lineHeight: 1.6 }}>
+                        <Typography 
+                          variant="h4" 
+                          sx={{ 
+                            fontWeight: 600,
+                            color: 'primary.main',
+                            mb: 2
+                          }}
+                        >
                           {result.message}
                         </Typography>
                       </Box>
                     )}
                   </Box>
-                ) : (
-                  <Typography variant="body1" color="text.secondary">
-                    {isAnalyzing ? 'Analyzing...' : 'Please answer all questions to see the analysis results.'}
-                  </Typography>
                 )}
               </Box>
             </Box>
